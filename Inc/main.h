@@ -131,6 +131,8 @@
 #define ema_coefficient 0.9f
 
 
+#define sonar_timeout_retrigger_us 200000
+
 /* USER CODE END Private defines */
 
 /**

@@ -49,6 +49,8 @@
 #include "gpio.h"
 
 /* USER CODE BEGIN Includes */
+#include "crc.h"
+
 
 /* USER CODE END Includes */
 
@@ -80,14 +82,29 @@ uint8_t sonar_running = 0;
 
 uint8_t results_string[19];
 
+// variables to store when each sensor was triggered to allow for timeout retriggering
+uint32_t usonic_0_trigger_time = 0;
+uint32_t usonic_1_trigger_time = 0;
+uint32_t usonic_2_trigger_time = 0;
+uint32_t usonic_3_trigger_time = 0;
+uint32_t usonic_4_trigger_time = 0;
+uint32_t usonic_5_trigger_time = 0;
+uint32_t usonic_6_trigger_time = 0;
+uint32_t usonic_7_trigger_time = 0;
+
+
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
 void SystemClock_Config(void);
 void Error_Handler(void);
 
+
 /* USER CODE BEGIN PFP */
 /* Private function prototypes -----------------------------------------------*/
+void delay_us(uint32_t us);
+void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin);
+void sonar_trigger(void);
 
 /* USER CODE END PFP */
 
@@ -121,6 +138,8 @@ int main(void)
   uint16_t count = 0;
   uint8_t teststring[] = "hello\n";
 
+  HAL_UART_Transmit_IT(&huart1, teststring, sizeof(teststring));
+
   HAL_GPIO_WritePin(LD4_GPIO_Port, LD4_Pin, GPIO_PIN_SET);
 
   HAL_TIM_Base_Start_IT(&htim2);
@@ -136,6 +155,29 @@ int main(void)
   HAL_GPIO_WritePin(sonar_6_trigger_port, sonar_6_trigger_pin, GPIO_PIN_RESET);
   HAL_GPIO_WritePin(sonar_7_trigger_port, sonar_7_trigger_pin, GPIO_PIN_RESET);
 
+  results_string[0] = 'T';
+  results_string[1] = 'H';
+  results_string[2] = (uint8_t)(sonar_0_range_ema_mm >> 8);
+  results_string[3] = (uint8_t)(sonar_0_range_ema_mm);
+  results_string[4] = (uint8_t)(sonar_1_range_ema_mm >> 8);;
+  results_string[5] = (uint8_t)(sonar_1_range_ema_mm);
+  results_string[6] = (uint8_t)(sonar_2_range_ema_mm >> 8);
+  results_string[7] = (uint8_t)(sonar_2_range_ema_mm);
+  results_string[8] = (uint8_t)(sonar_3_range_ema_mm >> 8);
+  results_string[9] = (uint8_t)(sonar_3_range_ema_mm);
+  results_string[10] = (uint8_t)(sonar_4_range_ema_mm >> 8);
+  results_string[11] = (uint8_t)(sonar_4_range_ema_mm);
+  results_string[12] = (uint8_t)(sonar_5_range_ema_mm >> 8);
+  results_string[13] = (uint8_t)(sonar_5_range_ema_mm);
+  results_string[14] = (uint8_t)(sonar_6_range_ema_mm >> 8);
+  results_string[15] = (uint8_t)(sonar_6_range_ema_mm);
+  results_string[16] = (uint8_t)(sonar_7_range_ema_mm >> 8);
+  results_string[17] = (uint8_t)(sonar_7_range_ema_mm);
+  results_string[18] = crc_crc8(results_string, 18);
+
+  HAL_UART_Transmit_IT(&huart1, results_string, sizeof(results_string));
+
+
   /* USER CODE END 2 */
 
   /* Infinite loop */
@@ -144,7 +186,33 @@ int main(void)
     {
   /* USER CODE END WHILE */
 
+
   /* USER CODE BEGIN 3 */
+      sonar_trigger();
+
+      results_string[2] = (uint8_t)(sonar_0_range_ema_mm >> 8);
+      results_string[3] = (uint8_t)(sonar_0_range_ema_mm);
+      results_string[4] = (uint8_t)(sonar_1_range_ema_mm >> 8);;
+      results_string[5] = (uint8_t)(sonar_1_range_ema_mm);
+      results_string[6] = (uint8_t)(sonar_2_range_ema_mm >> 8);
+      results_string[7] = (uint8_t)(sonar_2_range_ema_mm);
+      results_string[8] = (uint8_t)(sonar_3_range_ema_mm >> 8);
+      results_string[9] = (uint8_t)(sonar_3_range_ema_mm);
+      results_string[10] = (uint8_t)(sonar_4_range_ema_mm >> 8);
+      results_string[11] = (uint8_t)(sonar_4_range_ema_mm);
+      results_string[12] = (uint8_t)(sonar_5_range_ema_mm >> 8);
+      results_string[13] = (uint8_t)(sonar_5_range_ema_mm);
+      results_string[14] = (uint8_t)(sonar_6_range_ema_mm >> 8);
+      results_string[15] = (uint8_t)(sonar_6_range_ema_mm);
+      results_string[16] = (uint8_t)(sonar_7_range_ema_mm >> 8);
+      results_string[17] = (uint8_t)(sonar_7_range_ema_mm);
+      results_string[18] = crc_crc8(results_string, 18);
+
+      HAL_UART_Transmit_IT(&huart1, results_string, sizeof(results_string));
+
+      delay_us(10000);
+      //HAL_UART_Transmit_IT(&huart1, teststring, sizeof(teststring));
+
 
     }
   /* USER CODE END 3 */
@@ -301,13 +369,21 @@ void sonar_trigger(void)
 {
   //check if sonar x is running, if not then trigger it
   if ( !(sonar_running & (1 << 0)))
-  	{
-
-	  HAL_GPIO_WritePin(sonar_0_trigger_port, sonar_0_trigger_pin, GPIO_PIN_SET);
-	  delay_us(50);
-	  HAL_GPIO_WritePin(sonar_0_trigger_port, sonar_0_trigger_pin, GPIO_PIN_RESET);
-	  sonar_running |= (1 << 0);
-  	}
+    {
+      HAL_GPIO_WritePin(sonar_0_trigger_port, sonar_0_trigger_pin, GPIO_PIN_SET);
+      delay_us(50);
+      HAL_GPIO_WritePin(sonar_0_trigger_port, sonar_0_trigger_pin, GPIO_PIN_RESET);
+      sonar_running |= (1 << 0);
+      usonic_0_trigger_time = __HAL_TIM_GET_COUNTER(&htim2);
+    }
+  else if ( ( __HAL_TIM_GET_COUNTER(&htim2) - usonic_0_trigger_time) > sonar_timeout_retrigger_us)
+    {
+      HAL_GPIO_WritePin(sonar_0_trigger_port, sonar_0_trigger_pin, GPIO_PIN_SET);
+      delay_us(50);
+      HAL_GPIO_WritePin(sonar_0_trigger_port, sonar_0_trigger_pin, GPIO_PIN_RESET);
+      sonar_running |= (1 << 0);
+      usonic_0_trigger_time = __HAL_TIM_GET_COUNTER(&htim2);
+    }
 
   //check if sonar x is running, if not then trigger it
   if ( !(sonar_running & (1 << 1)))
